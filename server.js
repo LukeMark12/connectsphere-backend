@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const multer = require('multer');
+const multer = require('multer'); // Add this line if missing
 const path = require('path');
 const cors = require('cors');
 const http = require('http');
@@ -24,7 +24,7 @@ app.use(cors({ origin: 'https://connectsp.netlify.app/', credentials: true }));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Multer setup for multiple file uploads
+// File upload setup with multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -33,6 +33,7 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + path.extname(file.originalname));
   },
 });
+const upload = multer({ storage });
 
 // MongoDB connection
 mongoose.connect('mongodb+srv://connectsphereuser:SecurePass123!@connectsphere.mongodb.net/connectsphere?retryWrites=true&w=majority', {
@@ -204,22 +205,24 @@ app.get('/api/users/:username', authenticateToken, async (req, res) => {
 // Update User Profile
 app.put('/api/profile', authenticateToken, upload.single('profilePic'), async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     user.name = req.body.name || user.name;
     if (req.file) {
       user.profilePic = `/uploads/${req.file.filename}`;
     }
-    await user.save();
 
+    await user.save();
     res.json({
-      username: user.username,
       name: user.name,
       profilePic: user.profilePic,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error updating profile', error });
+    console.error('Error updating profile:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
