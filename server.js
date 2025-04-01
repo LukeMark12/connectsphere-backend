@@ -44,8 +44,9 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // MongoDB connection
+console.log('Environment variables:', process.env); // Debug environment variables
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/connectsphere';
-console.log('Attempting to connect to MongoDB with URI:', MONGO_URI); // Add logging
+console.log('Attempting to connect to MongoDB with URI:', MONGO_URI);
 mongoose.connect(MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch((error) => {
@@ -121,13 +122,17 @@ function authenticateToken(req, res, next) {
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  console.log('Health check endpoint hit'); // Add logging
-  res.json({ message: 'Server is running' });
+  console.log('Health check endpoint hit');
+  res.json({ message: 'Server is running', mongodbConnected: mongoose.connection.readyState === 1 });
 });
 
 // User Registration
 app.post('/api/register', async (req, res) => {
-  console.log('Register endpoint hit:', req.body); // Add logging
+  console.log('Register endpoint hit:', req.body);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { username, name, password } = req.body;
 
   if (!username || !password) {
@@ -154,7 +159,11 @@ app.post('/api/register', async (req, res) => {
 
 // User Login
 app.post('/api/login', async (req, res) => {
-  console.log('Login endpoint hit:', req.body); // Add logging
+  console.log('Login endpoint hit:', req.body);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { username, password } = req.body;
 
   try {
@@ -174,7 +183,11 @@ app.post('/api/login', async (req, res) => {
 
 // Get Current User Info
 app.get('/api/main', authenticateToken, async (req, res) => {
-  console.log('Main endpoint hit for user:', req.user.id); // Add logging
+  console.log('Main endpoint hit for user:', req.user.id);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -193,7 +206,11 @@ app.get('/api/main', authenticateToken, async (req, res) => {
 
 // Get User Profile by Username
 app.get('/api/users/:username', authenticateToken, async (req, res) => {
-  console.log('User profile endpoint hit for username:', req.params.username); // Add logging
+  console.log('User profile endpoint hit for username:', req.params.username);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const user = await User.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -225,7 +242,11 @@ app.get('/api/users/:username', authenticateToken, async (req, res) => {
 
 // Update User Profile
 app.put('/api/profile', authenticateToken, upload.single('profilePic'), async (req, res) => {
-  console.log('Profile update endpoint hit for user:', req.user.id); // Add logging
+  console.log('Profile update endpoint hit for user:', req.user.id);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -250,7 +271,11 @@ app.put('/api/profile', authenticateToken, upload.single('profilePic'), async (r
 
 // Get All Users (for Follow Suggestions)
 app.get('/api/users', authenticateToken, async (req, res) => {
-  console.log('Users endpoint hit for user:', req.user.id); // Add logging
+  console.log('Users endpoint hit for user:', req.user.id);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const currentUser = await User.findById(req.user.id);
     if (!currentUser) return res.status(404).json({ message: 'User not found' });
@@ -271,7 +296,11 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 
 // Follow a User
 app.post('/api/follow/:userId', authenticateToken, async (req, res) => {
-  console.log('Follow endpoint hit for user:', req.user.id, 'to follow:', req.params.userId); // Add logging
+  console.log('Follow endpoint hit for user:', req.user.id, 'to follow:', req.params.userId);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const user = await User.findById(req.user.id);
     const userToFollow = await User.findById(req.params.userId);
@@ -308,7 +337,11 @@ app.post('/api/follow/:userId', authenticateToken, async (req, res) => {
 
 // Unfollow a User
 app.post('/api/unfollow/:userId', authenticateToken, async (req, res) => {
-  console.log('Unfollow endpoint hit for user:', req.user.id, 'to unfollow:', req.params.userId); // Add logging
+  console.log('Unfollow endpoint hit for user:', req.user.id, 'to unfollow:', req.params.userId);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const user = await User.findById(req.user.id);
     const userToUnfollow = await User.findById(req.params.userId);
@@ -331,7 +364,11 @@ app.post('/api/unfollow/:userId', authenticateToken, async (req, res) => {
 
 // Get Feed (Posts from Followed Users and Self)
 app.get('/api/feed', authenticateToken, async (req, res) => {
-  console.log('Feed endpoint hit for user:', req.user.id); // Add logging
+  console.log('Feed endpoint hit for user:', req.user.id);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -366,7 +403,11 @@ app.get('/api/feed', authenticateToken, async (req, res) => {
 
 // Create a Post (Support multiple images)
 app.post('/api/posts', authenticateToken, upload.array('photos', 10), async (req, res) => {
-  console.log('Create post endpoint hit for user:', req.user.id); // Add logging
+  console.log('Create post endpoint hit for user:', req.user.id);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { content, visibility } = req.body;
 
   if (!content) return res.status(400).json({ message: 'Content is required' });
@@ -398,7 +439,11 @@ app.post('/api/posts', authenticateToken, upload.array('photos', 10), async (req
 
 // Update a Post (Support multiple images)
 app.put('/api/posts/:postId', authenticateToken, upload.array('photos', 10), async (req, res) => {
-  console.log('Update post endpoint hit for post:', req.params.postId); // Add logging
+  console.log('Update post endpoint hit for post:', req.params.postId);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { content, visibility } = req.body;
   const { postId } = req.params;
 
@@ -425,7 +470,11 @@ app.put('/api/posts/:postId', authenticateToken, upload.array('photos', 10), asy
 
 // Delete a Post
 app.delete('/api/posts/:postId', authenticateToken, async (req, res) => {
-  console.log('Delete post endpoint hit for post:', req.params.postId); // Add logging
+  console.log('Delete post endpoint hit for post:', req.params.postId);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { postId } = req.params;
 
   try {
@@ -445,7 +494,11 @@ app.delete('/api/posts/:postId', authenticateToken, async (req, res) => {
 
 // Like a Post
 app.post('/api/posts/:postId/like', authenticateToken, async (req, res) => {
-  console.log('Like post endpoint hit for post:', req.params.postId); // Add logging
+  console.log('Like post endpoint hit for post:', req.params.postId);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { postId } = req.params;
 
   try {
@@ -485,7 +538,11 @@ app.post('/api/posts/:postId/like', authenticateToken, async (req, res) => {
 
 // Unlike a Post
 app.post('/api/posts/:postId/unlike', authenticateToken, async (req, res) => {
-  console.log('Unlike post endpoint hit for post:', req.params.postId); // Add logging
+  console.log('Unlike post endpoint hit for post:', req.params.postId);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { postId } = req.params;
 
   try {
@@ -509,7 +566,11 @@ app.post('/api/posts/:postId/unlike', authenticateToken, async (req, res) => {
 
 // Add a Comment to a Post
 app.post('/api/posts/:postId/comment', authenticateToken, async (req, res) => {
-  console.log('Comment endpoint hit for post:', req.params.postId); // Add logging
+  console.log('Comment endpoint hit for post:', req.params.postId);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   const { content } = req.body;
   const { postId } = req.params;
 
@@ -557,7 +618,11 @@ app.post('/api/posts/:postId/comment', authenticateToken, async (req, res) => {
 
 // Get Notifications
 app.get('/api/notifications', authenticateToken, async (req, res) => {
-  console.log('Notifications endpoint hit for user:', req.user.id); // Add logging
+  console.log('Notifications endpoint hit for user:', req.user.id);
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({ message: 'Service unavailable: MongoDB not connected' });
+  }
+
   try {
     const notifications = await Notification.find({ userId: req.user.id })
       .populate('fromUserId', 'username')
