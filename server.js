@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
 });
 
 // MongoDB connection
-mongoose.connect('mongodb://localhost:27017/connectsphere', {
+mongoose.connect('mongodb+srv://connectsphereuser:SecurePass123!@connectsphere.mongodb.net/connectsphere?retryWrites=true&w=majority', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => {
