@@ -36,7 +36,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // MongoDB connection
-mongoose.connect('mongodb+srv://connectsphereuser:SecurePass123!@connectsphere.mongodb.net/connectsphere?retryWrites=true&w=majority', {
+mongoose.connect('mongodb+srv://connectsphereuser:SecurePass123!@connectsphere.woxn1xj.mongodb.net/?retryWrites=true&w=majority&appName=ConnectSphere', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => {
