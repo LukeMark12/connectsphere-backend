@@ -97,18 +97,17 @@ const Notification = mongoose.model('Notification', NotificationSchema);
 const SECRET = 'your_jwt_secret';
 
 // Middleware to verify JWT
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) return res.status(401).json({ message: 'Unauthorized' });
+function authenticateToken(req, res, next) {
+  const token = req.header('Authorization');
+  if (!token) return res.status(401).json({ message: 'Access Denied' });
 
   jwt.verify(token, SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid token' });
+    if (err) return res.status(403).json({ message: 'Invalid Token' });
     req.user = user;
     next();
   });
-};
+}
+
 
 // Routes
 
