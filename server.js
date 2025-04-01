@@ -44,14 +44,13 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // MongoDB connection
-console.log('Environment variables:', process.env); // Debug environment variables
+console.log('Environment variables:', process.env);
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/connectsphere';
 console.log('Attempting to connect to MongoDB with URI:', MONGO_URI);
 mongoose.connect(MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch((error) => {
     console.error('MongoDB connection error:', error);
-    // Don't exit the process, let the app continue running
   });
 
 // Models
@@ -216,7 +215,7 @@ app.get('/api/users/:username', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const posts = await Post.find({ userId: user._id })
-      .populate('userId', 'username name profilePic')
+      .populate('userId', 'username profilePic')
       .sort({ createdAt: -1 });
 
     const currentUser = await User.findById(req.user.id);
@@ -382,9 +381,9 @@ app.get('/api/feed', authenticateToken, async (req, res) => {
         { userId: user._id },
       ],
     })
-      .populate('userId', 'username name profilePic')
+      .populate('userId', 'username profilePic')
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(20);
 
     // Convert likes to an array of strings
     const cleanedPosts = posts.map((post) => {
@@ -428,7 +427,7 @@ app.post('/api/posts', authenticateToken, upload.array('photos', 10), async (req
     await post.save();
 
     const populatedPost = await Post.findById(post._id)
-      .populate('userId', 'username name profilePic');
+      .populate('userId', 'username profilePic');
 
     res.json({ post: populatedPost.toObject() });
   } catch (error) {
@@ -448,7 +447,7 @@ app.put('/api/posts/:postId', authenticateToken, upload.array('photos', 10), asy
   const { postId } = req.params;
 
   try {
-    const post = await Post.findById(postId).populate('userId', 'username name profilePic');
+    const post = await Post.findById(postId).populate('userId', 'username profilePic');
     if (!post) return res.status(404).json({ message: 'Post not found' });
     if (post.userId._id.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Unauthorized' });
@@ -503,7 +502,7 @@ app.post('/api/posts/:postId/like', authenticateToken, async (req, res) => {
 
   try {
     const user = await User.findById(req.user.id);
-    const post = await Post.findById(postId).populate('userId', 'username name profilePic');
+    const post = await Post.findById(postId).populate('userId', 'username profilePic');
     if (!user || !post) return res.status(404).json({ message: 'User or post not found' });
 
     if (!post.likes.includes(user._id)) {
@@ -547,7 +546,7 @@ app.post('/api/posts/:postId/unlike', authenticateToken, async (req, res) => {
 
   try {
     const user = await User.findById(req.user.id);
-    const post = await Post.findById(postId).populate('userId', 'username name profilePic');
+    const post = await Post.findById(postId).populate('userId', 'username profilePic');
     if (!user || !post) return res.status(404).json({ message: 'User or post not found' });
 
     post.likes = post.likes.filter((id) => id.toString() !== user._id.toString());
@@ -580,7 +579,7 @@ app.post('/api/posts/:postId/comment', authenticateToken, async (req, res) => {
 
   try {
     const user = await User.findById(req.user.id);
-    const post = await Post.findById(postId).populate('userId', 'username name profilePic');
+    const post = await Post.findById(postId).populate('userId', 'username profilePic');
     if (!user || !post) return res.status(404).json({ message: 'User or post not found' });
 
     post.comments.push({
@@ -636,9 +635,25 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
   }
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error in route:', err);
+  res.status(500).json({ message: 'Internal server error', error: err.message });
+});
+
 // Socket.IO Connection
+const MAX_CONNECTIONS = 100; // Adjust based on your needs
+let currentConnections = 0;
+
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+  if (currentConnections >= MAX_CONNECTIONS) {
+    console.log('Max connections reached, rejecting new connection:', socket.id);
+    socket.disconnect(true);
+    return;
+  }
+
+  currentConnections++;
+  console.log('A user connected:', socket.id, 'Total connections:', currentConnections);
 
   socket.on('join', (userId) => {
     socket.join(userId);
@@ -646,7 +661,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('A user disconnected:', socket.id);
+    currentConnections--;
+    console.log('A user disconnected:', socket.id, 'Total connections:', currentConnections);
   });
 });
 
@@ -658,6 +674,16 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// Log memory usage every 30 seconds
+setInterval(() => {
+  const used = process.memoryUsage();
+  console.log('Memory Usage:', {
+    heapTotal: `${Math.round(used.heapTotal / 1024 / 1024)} MB`,
+    heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)} MB`,
+    external: `${Math.round(used.external / 1024 / 1024)} MB`,
+  });
+}, 30000);
 
 // Start the Server
 const PORT = process.env.PORT || 3001;
