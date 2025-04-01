@@ -7,7 +7,7 @@ const path = require('path');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
-const fs = require('fs'); // Add this for creating the uploads directory
+const fs = require('fs');
 
 // Initialize Express app and HTTP server
 const app = express();
@@ -45,9 +45,13 @@ const upload = multer({ storage });
 
 // MongoDB connection
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/connectsphere';
+console.log('Attempting to connect to MongoDB with URI:', MONGO_URI); // Add logging
 mongoose.connect(MONGO_URI)
   .then(() => console.log('Connected to MongoDB'))
-  .catch((error) => console.error('MongoDB connection error:', error));
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+    // Don't exit the process, let the app continue running
+  });
 
 // Models
 const UserSchema = new mongoose.Schema({
@@ -115,8 +119,15 @@ function authenticateToken(req, res, next) {
 
 // Routes
 
+// Health check route
+app.get('/api/health', (req, res) => {
+  console.log('Health check endpoint hit'); // Add logging
+  res.json({ message: 'Server is running' });
+});
+
 // User Registration
 app.post('/api/register', async (req, res) => {
+  console.log('Register endpoint hit:', req.body); // Add logging
   const { username, name, password } = req.body;
 
   if (!username || !password) {
@@ -136,12 +147,14 @@ app.post('/api/register', async (req, res) => {
     const token = jwt.sign({ id: user._id }, SECRET, { expiresIn: '1h' });
     res.json({ token, userId: user._id, username: user.username });
   } catch (error) {
+    console.error('Error registering user:', error);
     res.status(500).json({ message: 'Error registering user', error });
   }
 });
 
 // User Login
 app.post('/api/login', async (req, res) => {
+  console.log('Login endpoint hit:', req.body); // Add logging
   const { username, password } = req.body;
 
   try {
@@ -154,12 +167,14 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign({ id: user._id }, SECRET, { expiresIn: '1h' });
     res.json({ token, userId: user._id, username: user.username });
   } catch (error) {
+    console.error('Error logging in:', error);
     res.status(500).json({ message: 'Error logging in', error });
   }
 });
 
 // Get Current User Info
 app.get('/api/main', authenticateToken, async (req, res) => {
+  console.log('Main endpoint hit for user:', req.user.id); // Add logging
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -171,12 +186,14 @@ app.get('/api/main', authenticateToken, async (req, res) => {
       profilePic: user.profilePic,
     });
   } catch (error) {
+    console.error('Error fetching user info:', error);
     res.status(500).json({ message: 'Error fetching user info', error });
   }
 });
 
 // Get User Profile by Username
 app.get('/api/users/:username', authenticateToken, async (req, res) => {
+  console.log('User profile endpoint hit for username:', req.params.username); // Add logging
   try {
     const user = await User.findOne({ username: req.params.username });
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -201,14 +218,16 @@ app.get('/api/users/:username', authenticateToken, async (req, res) => {
       posts,
     });
   } catch (error) {
+    console.error('Error fetching user profile:', error);
     res.status(500).json({ message: 'Error fetching user profile', error });
   }
 });
 
 // Update User Profile
 app.put('/api/profile', authenticateToken, upload.single('profilePic'), async (req, res) => {
+  console.log('Profile update endpoint hit for user:', req.user.id); // Add logging
   try {
-    const user = await User.findById(req.user.id); // Changed req.user.userId to req.user.id
+    const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -231,6 +250,7 @@ app.put('/api/profile', authenticateToken, upload.single('profilePic'), async (r
 
 // Get All Users (for Follow Suggestions)
 app.get('/api/users', authenticateToken, async (req, res) => {
+  console.log('Users endpoint hit for user:', req.user.id); // Add logging
   try {
     const currentUser = await User.findById(req.user.id);
     if (!currentUser) return res.status(404).json({ message: 'User not found' });
@@ -244,12 +264,14 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 
     res.json(usersWithFollowingStatus);
   } catch (error) {
+    console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Error fetching users', error });
   }
 });
 
 // Follow a User
 app.post('/api/follow/:userId', authenticateToken, async (req, res) => {
+  console.log('Follow endpoint hit for user:', req.user.id, 'to follow:', req.params.userId); // Add logging
   try {
     const user = await User.findById(req.user.id);
     const userToFollow = await User.findById(req.params.userId);
@@ -279,12 +301,14 @@ app.post('/api/follow/:userId', authenticateToken, async (req, res) => {
 
     res.json({ message: 'Followed user' });
   } catch (error) {
+    console.error('Error following user:', error);
     res.status(500).json({ message: 'Error following user', error });
   }
 });
 
 // Unfollow a User
 app.post('/api/unfollow/:userId', authenticateToken, async (req, res) => {
+  console.log('Unfollow endpoint hit for user:', req.user.id, 'to unfollow:', req.params.userId); // Add logging
   try {
     const user = await User.findById(req.user.id);
     const userToUnfollow = await User.findById(req.params.userId);
@@ -300,12 +324,14 @@ app.post('/api/unfollow/:userId', authenticateToken, async (req, res) => {
 
     res.json({ message: 'Unfollowed user' });
   } catch (error) {
+    console.error('Error unfollowing user:', error);
     res.status(500).json({ message: 'Error unfollowing user', error });
   }
 });
 
 // Get Feed (Posts from Followed Users and Self)
 app.get('/api/feed', authenticateToken, async (req, res) => {
+  console.log('Feed endpoint hit for user:', req.user.id); // Add logging
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -333,12 +359,14 @@ app.get('/api/feed', authenticateToken, async (req, res) => {
 
     res.json(cleanedPosts);
   } catch (error) {
+    console.error('Error fetching feed:', error);
     res.status(500).json({ message: 'Error fetching feed', error });
   }
 });
 
 // Create a Post (Support multiple images)
 app.post('/api/posts', authenticateToken, upload.array('photos', 10), async (req, res) => {
+  console.log('Create post endpoint hit for user:', req.user.id); // Add logging
   const { content, visibility } = req.body;
 
   if (!content) return res.status(400).json({ message: 'Content is required' });
@@ -363,12 +391,14 @@ app.post('/api/posts', authenticateToken, upload.array('photos', 10), async (req
 
     res.json({ post: populatedPost.toObject() });
   } catch (error) {
+    console.error('Error creating post:', error);
     res.status(500).json({ message: 'Error creating post', error });
   }
 });
 
 // Update a Post (Support multiple images)
 app.put('/api/posts/:postId', authenticateToken, upload.array('photos', 10), async (req, res) => {
+  console.log('Update post endpoint hit for post:', req.params.postId); // Add logging
   const { content, visibility } = req.body;
   const { postId } = req.params;
 
@@ -388,12 +418,14 @@ app.put('/api/posts/:postId', authenticateToken, upload.array('photos', 10), asy
 
     res.json({ post: post.toObject() });
   } catch (error) {
+    console.error('Error updating post:', error);
     res.status(500).json({ message: 'Error updating post', error });
   }
 });
 
 // Delete a Post
 app.delete('/api/posts/:postId', authenticateToken, async (req, res) => {
+  console.log('Delete post endpoint hit for post:', req.params.postId); // Add logging
   const { postId } = req.params;
 
   try {
@@ -406,12 +438,14 @@ app.delete('/api/posts/:postId', authenticateToken, async (req, res) => {
     await post.deleteOne();
     res.json({ message: 'Post deleted' });
   } catch (error) {
+    console.error('Error deleting post:', error);
     res.status(500).json({ message: 'Error deleting post', error });
   }
 });
 
 // Like a Post
 app.post('/api/posts/:postId/like', authenticateToken, async (req, res) => {
+  console.log('Like post endpoint hit for post:', req.params.postId); // Add logging
   const { postId } = req.params;
 
   try {
@@ -444,12 +478,14 @@ app.post('/api/posts/:postId/like', authenticateToken, async (req, res) => {
 
     res.json({ post: post.toObject() });
   } catch (error) {
+    console.error('Error liking post:', error);
     res.status(500).json({ message: 'Error liking post', error });
   }
 });
 
 // Unlike a Post
 app.post('/api/posts/:postId/unlike', authenticateToken, async (req, res) => {
+  console.log('Unlike post endpoint hit for post:', req.params.postId); // Add logging
   const { postId } = req.params;
 
   try {
@@ -466,12 +502,14 @@ app.post('/api/posts/:postId/unlike', authenticateToken, async (req, res) => {
 
     res.json({ post: post.toObject() });
   } catch (error) {
+    console.error('Error unliking post:', error);
     res.status(500).json({ message: 'Error unliking post', error });
   }
 });
 
 // Add a Comment to a Post
 app.post('/api/posts/:postId/comment', authenticateToken, async (req, res) => {
+  console.log('Comment endpoint hit for post:', req.params.postId); // Add logging
   const { content } = req.body;
   const { postId } = req.params;
 
@@ -512,12 +550,14 @@ app.post('/api/posts/:postId/comment', authenticateToken, async (req, res) => {
 
     res.json({ post: post.toObject() });
   } catch (error) {
+    console.error('Error adding comment:', error);
     res.status(500).json({ message: 'Error adding comment', error });
   }
 });
 
 // Get Notifications
 app.get('/api/notifications', authenticateToken, async (req, res) => {
+  console.log('Notifications endpoint hit for user:', req.user.id); // Add logging
   try {
     const notifications = await Notification.find({ userId: req.user.id })
       .populate('fromUserId', 'username')
@@ -526,6 +566,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
 
     res.json(notifications);
   } catch (error) {
+    console.error('Error fetching notifications:', error);
     res.status(500).json({ message: 'Error fetching notifications', error });
   }
 });
